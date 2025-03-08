@@ -357,12 +357,12 @@ EXTRA_FILES=
 CLIENT_EXTRA_FILES=
 
 ifneq (,$(findstring "$(COMPILE_PLATFORM)", "linux" "gnu_kfreebsd" "kfreebsd-gnu" "gnu"))
-  TOOLS_CFLAGS += -DARCH_STRING=\"$(COMPILE_ARCH)\"
+  TOOLS_CFLAGS += -DARCH_STRING=\"$(COMPILE_ARCH)\" -std=gnu17
 endif
 
 ifneq (,$(findstring "$(PLATFORM)", "linux" "gnu_kfreebsd" "kfreebsd-gnu" "gnu"))
   BASE_CFLAGS = -Wall -fno-strict-aliasing -Wimplicit -Wstrict-prototypes \
-    -pipe -DUSE_ICON -DARCH_STRING=\\\"$(ARCH)\\\"
+    -pipe -DUSE_ICON -DARCH_STRING=\\\"$(ARCH)\\\" -std=gnu17
   CLIENT_CFLAGS += $(SDL_CFLAGS)
 
   OPTIMIZEVM = -O3
