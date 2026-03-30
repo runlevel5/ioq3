@@ -25,3 +25,8 @@ add_compile_options(-fno-strict-aliasing)
 # This is necessary to hide all symbols unless explicitly exported
 # via the Q_EXPORT macro
 add_compile_options(-fvisibility=hidden)
+
+# PPC64: enable VSX (which implies Altivec) and target POWER8 as baseline
+if(ARCH STREQUAL "ppc64")
+    add_compile_options(-mcpu=power8 -mvsx)
+endif()
