@@ -362,7 +362,7 @@ void LerpMeshVertexes_altivec(md3Surface_t *surf, float backlerp)
 		__vector unsigned char newNormalsLoadPermute;
 		__vector unsigned char newNormalsStorePermute;
 		__vector float zero;
-		
+
 		newNormalsStorePermute = vec_lvsl(0,(float *)&newXyzScaleVec);
 		newXyzScaleVec = *(__vector float *)&newXyzScale;
 		newXyzScaleVec = vec_perm(newXyzScaleVec,newXyzScaleVec,newNormalsStorePermute);

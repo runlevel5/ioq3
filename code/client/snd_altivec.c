@@ -191,10 +191,10 @@ void S_PaintChannelFrom16_altivec( portable_samplepair_t paintbuffer[PAINTBUFFER
 				__vector unsigned char tmp;
 				__vector short s0, s1, sampleData0, sampleData1;
 				__vector signed int merge0, merge1;
-				__vector signed int d0, d1, d2, d3;				
+				__vector signed int d0, d1, d2, d3;
 				__vector unsigned char samplePermute0 =
 					VECCONST_UINT8(0, 1, 4, 5, 0, 1, 4, 5, 2, 3, 6, 7, 2, 3, 6, 7);
-				__vector unsigned char samplePermute1 = 
+				__vector unsigned char samplePermute1 =
 					VECCONST_UINT8(8, 9, 12, 13, 8, 9, 12, 13, 10, 11, 14, 15, 10, 11, 14, 15);
 				__vector unsigned char loadPermute0, loadPermute1;
 				
