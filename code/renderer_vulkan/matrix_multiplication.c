@@ -7,6 +7,10 @@
 
 #if defined __x86_64__
 #include <xmmintrin.h>
+#elif defined(__VSX__)
+#include <altivec.h>
+#undef bool
+#undef pixel
 #endif
 
 #include <string.h>
@@ -154,6 +158,27 @@ void MatrixMultiply4x4_SSE(const float A[16], const float B[16], float out[16])
 
         _mm_store_ps(&out[4*i], row);
     }
+#elif defined(__VSX__)
+    __vector float row1 = vec_xl(0, &B[0]);
+    __vector float row2 = vec_xl(0, &B[4]);
+    __vector float row3 = vec_xl(0, &B[8]);
+    __vector float row4 = vec_xl(0, &B[12]);
+
+    int i;
+    for(i=0; i<4; i++)
+    {
+        __vector float brod1 = vec_splats(A[4*i    ]);
+        __vector float brod2 = vec_splats(A[4*i + 1]);
+        __vector float brod3 = vec_splats(A[4*i + 2]);
+        __vector float brod4 = vec_splats(A[4*i + 3]);
+
+        __vector float row = vec_add(
+            vec_add( vec_mul(brod1, row1), vec_mul(brod2, row2) ),
+            vec_add( vec_mul(brod3, row3), vec_mul(brod4, row4) )
+            );
+
+        vec_xst(row, 0, &out[4*i]);
+    }
 #else
     MatrixMultiply4x4( A, B, out);
 #endif
@@ -207,6 +232,13 @@ void Mat4x1Transform_SSE( const float A[16], const float x[4], float out[4] )
     __m128 r4 = _mm_mul_ps( _mm_set1_ps(x[3]), _mm_load_ps(A+12) );
 
     _mm_store_ps(out, _mm_add_ps( _mm_add_ps(r1, r2), _mm_add_ps(r3, r4) ) );
+#elif defined(__VSX__)
+    __vector float r1 = vec_mul( vec_splats(x[0]), vec_xl(0, A   ) );
+    __vector float r2 = vec_mul( vec_splats(x[1]), vec_xl(0, A+4 ) );
+    __vector float r3 = vec_mul( vec_splats(x[2]), vec_xl(0, A+8 ) );
+    __vector float r4 = vec_mul( vec_splats(x[3]), vec_xl(0, A+12) );
+
+    vec_xst( vec_add( vec_add(r1, r2), vec_add(r3, r4) ), 0, out );
 #else
     Mat4Transform(A, x, out);
 #endif
@@ -463,6 +495,33 @@ float AugSrc[4]	= {src[0], src[1], src[2], 1.0f};
 
 
     _mm_store_ps(dst, _mm_add_ps( _mm_add_ps(res[0], res[1]),  _mm_add_ps(res[2], res[3]) ) );
+#elif defined(__VSX__)
+
+    float AugSrc[4] = {src[0], src[1], src[2], 1.0f};
+
+    __vector float row1 = vec_xl(0, &pMatProj[0]);
+    __vector float row2 = vec_xl(0, &pMatProj[4]);
+    __vector float row3 = vec_xl(0, &pMatProj[8]);
+    __vector float row4 = vec_xl(0, &pMatProj[12]);
+
+    __vector float res[4];
+    int i;
+    for(i=0; i<4; i++)
+    {
+        __vector float brod1 = vec_splats(pMatModel[4*i    ]);
+        __vector float brod2 = vec_splats(pMatModel[4*i + 1]);
+        __vector float brod3 = vec_splats(pMatModel[4*i + 2]);
+        __vector float brod4 = vec_splats(pMatModel[4*i + 3]);
+
+        __vector float scol = vec_splats(AugSrc[i]);
+
+        res[i] = vec_mul( vec_add(
+                              vec_add( vec_mul(brod1, row1), vec_mul(brod2, row2) ),
+                              vec_add( vec_mul(brod3, row3), vec_mul(brod4, row4) )
+                              ), scol);
+    }
+
+    vec_xst( vec_add( vec_add(res[0], res[1]), vec_add(res[2], res[3]) ), 0, dst );
 #else
     float eye[4];	
     TransformModelToClip(src, pMatModel, pMatProj, eye, dst );
