@@ -494,16 +494,35 @@ int Q_isnan(float x);
 
 #if idppc
 
+#if idppc_altivec && defined(__VSX__)
+#include <altivec.h>
+#undef bool
+#undef pixel
+static ID_INLINE float Q_rsqrt( float number ) {
+		__vector float vx = vec_splats(number);
+		__vector float y = vec_rsqrte(vx);
+		// Newton-Raphson: y = y * (1.5 - 0.5*x*y*y)
+		__vector float half_x = vec_splats(0.5f * number);
+		__vector float three_half = vec_splats(1.5f);
+		__vector float zero = (__vector float){0.0f, 0.0f, 0.0f, 0.0f};
+		__vector float y_sq = vec_madd(y, y, zero);
+		// vec_nmsub(a,b,c) = c - a*b = 1.5 - 0.5*x*y*y
+		__vector float factor = vec_nmsub(half_x, y_sq, three_half);
+		__vector float result = vec_madd(y, factor, zero);
+		return vec_extract(result, 0);
+	}
+#else
 static ID_INLINE float Q_rsqrt( float number ) {
 		float x = 0.5f * number;
                 float y;
-#ifdef __GNUC__            
-                asm("frsqrte %0,%1" : "=f" (y) : "f" (number));
+#ifdef __GNUC__
+                asm("frsqrtes %0,%1" : "=f" (y) : "f" (number));
 #else
-		y = __frsqrte( number );
+		y = __frsqrtes( number );
 #endif
 		return y * (1.5f - (x * y * y));
 	}
+#endif
 
 #ifdef __GNUC__            
 static ID_INLINE float Q_fabs(float x) {
