@@ -27,6 +27,7 @@ add_compile_options(-fno-strict-aliasing)
 add_compile_options(-fvisibility=hidden)
 
 # PPC64: enable VSX (which implies Altivec) and target POWER8 as baseline
+include(utils/arch)
 if(ARCH STREQUAL "ppc64")
     add_compile_options(-mcpu=power8 -mvsx)
 endif()
