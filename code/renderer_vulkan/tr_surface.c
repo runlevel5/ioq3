@@ -28,6 +28,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "tr_backend.h"
 #include "ref_import.h"
 #include "matrix_multiplication.h"
+
+#if idppc_altivec && defined(__VSX__)
+#include <altivec.h>
+#undef bool
+#undef pixel
+#endif
 #include "RB_SurfaceAnim.h"
 /*
 
@@ -549,6 +555,38 @@ static void VectorArrayNormalize(vec4_t *normals, unsigned int count)
 //    assert(count);
         
 #if idppc
+#if idppc_altivec && defined(__VSX__)
+    {
+        // VSX vectorized path: use vec_rsqrte + Newton-Raphson
+        __vector float zero = (__vector float){0.0f, 0.0f, 0.0f, 0.0f};
+        __vector float half = vec_splats(0.5f);
+        __vector float three_half = vec_splats(1.5f);
+        float *components = (float *)normals;
+
+        do {
+            // Load xyz (4th component ignored)
+            __vector float v = vec_xl(0, components);
+            // dot = x*x + y*y + z*z
+            __vector float sq = vec_madd(v, v, zero);
+            // Horizontal sum of first 3 elements
+            __vector float tmp = vec_sld(sq, sq, 4);
+            __vector float dot = vec_add(sq, tmp);
+            tmp = vec_sld(sq, sq, 8);
+            dot = vec_add(dot, tmp);
+            // rsqrt estimate + Newton-Raphson refinement
+            __vector float y0 = vec_rsqrte(dot);
+            __vector float half_dot = vec_mul(half, dot);
+            __vector float y0_sq = vec_madd(y0, y0, zero);
+            __vector float factor = vec_nmsub(half_dot, y0_sq, three_half);
+            __vector float inv_len = vec_madd(y0, factor, zero);
+            // Scale xyz by inv_len
+            __vector float result = vec_mul(v, inv_len);
+            // Store back xyz (stores 4 floats, w is overwritten but unused)
+            vec_xst(result, 0, components);
+            components += 4;
+        } while(count--);
+    }
+#else
     {
         register float half = 0.5;
         register float one  = 1.0;
@@ -570,9 +608,9 @@ static void VectorArrayNormalize(vec4_t *normals, unsigned int count)
             B = x*x + y*y + z*z;
 
 #ifdef __GNUC__            
-            asm("frsqrte %0,%1" : "=f" (y0) : "f" (B));
+            asm("frsqrtes %0,%1" : "=f" (y0) : "f" (B));
 #else
-			y0 = __frsqrte(B);
+			y0 = __frsqrtes(B);
 #endif
             y1 = y0 + half*y0*(one - B*y0*y0);
 
@@ -584,6 +622,7 @@ static void VectorArrayNormalize(vec4_t *normals, unsigned int count)
             components[-2] = z;
         } while(count--);
     }
+#endif
 #else // No assembly version for this architecture, or C_ONLY defined
 	// given the input, it's safe to call VectorNormalizeFast
     while (count--) {
