@@ -31,6 +31,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include <ctype.h>
 #include <errno.h>
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
@@ -746,6 +750,32 @@ char *Sys_ParseProtocolUri( const char *uri )
 #	endif
 #endif
 
+#ifndef _WIN32
+static volatile sig_atomic_t sys_quitSignal = 0;
+
+/*
+=================
+Sys_QuitSigHandler
+
+SIGTERM and SIGINT ask to quit: do it from the main loop, as the quit
+command does. Shutting down in the signal handler, on top of whatever the
+signal interrupted, can deadlock, e.g. destroying the Vulkan semaphore that
+an interrupted vkQueuePresentKHR() waits on.
+
+Asked again, the quit is stuck: _exit at once. Sys_Exit could take the same
+locks (SDL, stdio) the quit is stuck on. The PID file stays, so the next
+start is treated as an abnormal exit.
+=================
+*/
+static void Sys_QuitSigHandler( int signal )
+{
+	if( sys_quitSignal )
+		_exit( 1 );
+
+	sys_quitSignal = signal;
+}
+#endif
+
 /*
 =================
 Sys_SigHandler
@@ -884,8 +914,13 @@ int main( int argc, char **argv )
 	signal( SIGILL, Sys_SigHandler );
 	signal( SIGFPE, Sys_SigHandler );
 	signal( SIGSEGV, Sys_SigHandler );
+#ifdef _WIN32
 	signal( SIGTERM, Sys_SigHandler );
 	signal( SIGINT, Sys_SigHandler );
+#else
+	signal( SIGTERM, Sys_QuitSigHandler );
+	signal( SIGINT, Sys_QuitSigHandler );
+#endif
 
 #ifdef __EMSCRIPTEN__
 	emscripten_set_main_loop( Com_Frame, 0, 1 );
@@ -893,6 +928,11 @@ int main( int argc, char **argv )
 	while( 1 )
 	{
 		Com_Frame( );
+
+#ifndef _WIN32
+		if( sys_quitSignal )
+			Cbuf_ExecuteText( EXEC_NOW, va( "quit \"Received signal %d\"", (int)sys_quitSignal ) );
+#endif
 	}
 #endif
 
